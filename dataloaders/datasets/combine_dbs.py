@@ -3,6 +3,7 @@ import torch.utils.data as data
 
 class CombineDBs(data.Dataset):
     NUM_CLASSES = 21
+
     def __init__(self, dataloaders, excluded=None):
         self.dataloaders = dataloaders
         self.excluded = excluded
@@ -75,7 +76,8 @@ if __name__ == "__main__":
     pascal_voc_train = pascal.VOCSegmentation(args, split='train')
 
     dataset = CombineDBs([pascal_voc_train, sbd], excluded=[pascal_voc_val])
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=2, shuffle=True, num_workers=0)
+    dataloader = torch.utils.data.DataLoader(
+        dataset, batch_size=1, shuffle=True, num_workers=0)
 
     for ii, sample in enumerate(dataloader):
         for jj in range(sample["image"].size()[0]):
