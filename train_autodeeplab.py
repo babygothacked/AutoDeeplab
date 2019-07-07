@@ -280,7 +280,7 @@ def main():
     args.cuda = not args.no_cuda and torch.cuda.is_available()
 
     print("============================\n",
-          args, "============================\n")
+          , "============================\n")
 
     if args.cuda:
         try:
