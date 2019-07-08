@@ -20,7 +20,6 @@ from architect import Architect
 class Trainer(object):
     def __init__(self, args):
         self.args = args
-
         # Define Saver
         self.saver = Saver(args)
         self.saver.save_experiment_config()
