@@ -16,10 +16,10 @@ from utils.metrics import Evaluator
 from auto_deeplab import AutoDeeplab
 from architect import Architect
 
+
 class Trainer(object):
     def __init__(self, args):
         self.args = args
-
         # Define Saver
         self.saver = Saver(args)
         self.saver.save_experiment_config()
@@ -29,41 +29,44 @@ class Trainer(object):
 
         # Define Dataloader
         kwargs = {'num_workers': args.workers, 'pin_memory': True}
-        self.train_loader1, self.train_loader2, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
+        self.train_loader1, self.train_loader2, self.val_loader, self.test_loader, self.nclass = make_data_loader(
+            args, **kwargs)
 
         # Define Criterion
         # whether to use class balanced weights
         if args.use_balanced_weights:
-            classes_weights_path = os.path.join(Path.db_root_dir(args.dataset), args.dataset+'_classes_weights.npy')
+            classes_weights_path = os.path.join(Path.db_root_dir(
+                args.dataset), args.dataset+'_classes_weights.npy')
             if os.path.isfile(classes_weights_path):
                 weight = np.load(classes_weights_path)
             else:
-                weight = calculate_weigths_labels(args.dataset, self.train_loader, self.nclass)
+                weight = calculate_weigths_labels(
+                    args.dataset, self.train_loader, self.nclass)
             weight = torch.from_numpy(weight.astype(np.float32))
         else:
             weight = None
-        self.criterion = SegmentationLosses(weight=weight, cuda=args.cuda).build_loss(mode=args.loss_type)
+        self.criterion = SegmentationLosses(
+            weight=weight, cuda=args.cuda).build_loss(mode=args.loss_type)
 
         # Define network
-        model = AutoDeeplab (21, 12, self.criterion)
+        model = AutoDeeplab(21, 12, self.criterion)
         optimizer = torch.optim.SGD(
-                model.parameters(),
-                args.lr,
-                momentum=args.momentum,
-                weight_decay=args.weight_decay
-            )
+            model.parameters(),
+            args.lr,
+            momentum=args.momentum,
+            weight_decay=args.weight_decay
+        )
         self.model, self.optimizer = model, optimizer
 
         # Using cuda
         if args.cuda:
-            self.model = torch.nn.DataParallel(self.model, device_ids=self.args.gpu_ids)
+            self.model = torch.nn.DataParallel(
+                self.model, device_ids=self.args.gpu_ids)
             patch_replication_callback(self.model)
             self.model = self.model.cuda()
-            print ('cuda finished')
-
+            print('cuda finished')
 
         # Define Optimizer
-
 
         self.model, self.optimizer = model, optimizer
 
@@ -71,14 +74,15 @@ class Trainer(object):
         self.evaluator = Evaluator(self.nclass)
         # Define lr scheduler
         self.scheduler = LR_Scheduler(args.lr_scheduler, args.lr,
-                                            args.epochs, len(self.train_loader1))
+                                      args.epochs, len(self.train_loader1))
 
-        self.architect = Architect (self.model, args)
+        self.architect = Architect(self.model, args)
         # Resuming checkpoint
         self.best_pred = 0.0
         if args.resume is not None:
             if not os.path.isfile(args.resume):
-                raise RuntimeError("=> no checkpoint found at '{}'" .format(args.resume))
+                raise RuntimeError(
+                    "=> no checkpoint found at '{}'" .format(args.resume))
             checkpoint = torch.load(args.resume)
             args.start_epoch = checkpoint['epoch']
             if args.cuda:
@@ -102,15 +106,15 @@ class Trainer(object):
         num_img_tr = len(self.train_loader1)
         for i, sample in enumerate(tbar):
             image, target = sample['image'], sample['label']
-            search = next (iter (self.train_loader2))
+            search = next(iter(self.train_loader2))
             image_search, target_search = search['image'], search['label']
             # print ('------------------------begin-----------------------')
             if self.args.cuda:
                 image, target = image.cuda(), target.cuda()
-                image_search, target_search = image_search.cuda (), target_search.cuda () 
+                image_search, target_search = image_search.cuda(), target_search.cuda()
                 # print ('cuda finish')
 
-            self.architect.step (image_search, target_search)
+            self.architect.step(image_search, target_search)
             self.scheduler(self.optimizer, i, epoch, self.best_pred)
             self.optimizer.zero_grad()
             output = self.model(image)
@@ -119,15 +123,18 @@ class Trainer(object):
             self.optimizer.step()
             train_loss += loss.item()
             tbar.set_description('Train loss: %.3f' % (train_loss / (i + 1)))
-            self.writer.add_scalar('train/total_loss_iter', loss.item(), i + num_img_tr * epoch)
+            self.writer.add_scalar(
+                'train/total_loss_iter', loss.item(), i + num_img_tr * epoch)
 
             # Show 10 * 3 inference results each epoch
             if i % (num_img_tr // 10) == 0:
                 global_step = i + num_img_tr * epoch
-                self.summary.visualize_image(self.writer, self.args.dataset, image, target, output, global_step)
+                self.summary.visualize_image(
+                    self.writer, self.args.dataset, image, target, output, global_step)
 
         self.writer.add_scalar('train/total_loss_epoch', train_loss, epoch)
-        print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
+        print('[Epoch: %d, numImages: %5d]' %
+              (epoch, i * self.args.batch_size + image.data.shape[0]))
         print('Loss: %.3f' % train_loss)
 
         if self.args.no_val:
@@ -139,7 +146,6 @@ class Trainer(object):
                 'optimizer': self.optimizer.state_dict(),
                 'best_pred': self.best_pred,
             }, is_best)
-
 
     def validation(self, epoch):
         self.model.eval()
@@ -172,8 +178,10 @@ class Trainer(object):
         self.writer.add_scalar('val/Acc_class', Acc_class, epoch)
         self.writer.add_scalar('val/fwIoU', FWIoU, epoch)
         print('Validation:')
-        print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
-        print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}".format(Acc, Acc_class, mIoU, FWIoU))
+        print('[Epoch: %d, numImages: %5d]' %
+              (epoch, i * self.args.batch_size + image.data.shape[0]))
+        print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}".format(
+            Acc, Acc_class, mIoU, FWIoU))
         print('Loss: %.3f' % test_loss)
 
         new_pred = mIoU
@@ -187,8 +195,10 @@ class Trainer(object):
                 'best_pred': self.best_pred,
             }, is_best)
 
+
 def main():
-    parser = argparse.ArgumentParser(description="PyTorch DeeplabV3Plus Training")
+    parser = argparse.ArgumentParser(
+        description="PyTorch DeeplabV3Plus Training")
     parser.add_argument('--backbone', type=str, default='resnet',
                         choices=['resnet', 'xception', 'drn', 'mobilenet'],
                         help='backbone name (default: resnet)')
@@ -217,10 +227,10 @@ def main():
                         help='number of epochs to train (default: auto)')
     parser.add_argument('--start_epoch', type=int, default=0,
                         metavar='N', help='start epochs (default:0)')
-    parser.add_argument('--batch-size', type=int, default=None,
+    parser.add_argument('--batch-size', type=int, default=1,
                         metavar='N', help='input batch size for \
                                 training (default: auto)')
-    parser.add_argument('--test-batch-size', type=int, default=None,
+    parser.add_argument('--test-batch-size', type=int, default=1,
                         metavar='N', help='input batch size for \
                                 testing (default: auto)')
     parser.add_argument('--use-balanced-weights', action='store_true', default=False,
@@ -244,8 +254,8 @@ def main():
     parser.add_argument('--nesterov', action='store_true', default=False,
                         help='whether use nesterov (default: False)')
     # cuda, seed and logging
-    parser.add_argument('--no-cuda', action='store_true', default=
-                        False, help='disables CUDA training')
+    parser.add_argument('--no-cuda', action='store_true',
+                        default=False, help='disables CUDA training')
     parser.add_argument('--gpu-ids', type=str, default='0',
                         help='use which gpu to train, must be a \
                         comma-separated list of integers only (default=0)')
@@ -267,11 +277,17 @@ def main():
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and torch.cuda.is_available()
+
+    print("============================")
+    print(args)
+    print("============================")
+
     if args.cuda:
         try:
             args.gpu_ids = [int(s) for s in args.gpu_ids.split(',')]
         except ValueError:
-            raise ValueError('Argument --gpu_ids must be a comma-separated list of integers only')
+            raise ValueError(
+                'Argument --gpu_ids must be a comma-separated list of integers only')
 
     if args.sync_bn is None:
         if args.cuda and len(args.gpu_ids) > 1:
@@ -300,8 +316,8 @@ def main():
             'cityscapes': 0.01,
             'pascal': 0.007,
         }
-        args.lr = lrs[args.dataset.lower()] / (4 * len(args.gpu_ids)) * args.batch_size
-
+        args.lr = lrs[args.dataset.lower()] / \
+            (4 * len(args.gpu_ids)) * args.batch_size
 
     if args.checkname is None:
         args.checkname = 'deeplab-'+str(args.backbone)
@@ -317,5 +333,6 @@ def main():
 
     trainer.writer.close()
 
+
 if __name__ == "__main__":
-   main()
+    main()

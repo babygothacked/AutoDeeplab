@@ -7,6 +7,7 @@ from mypath import Path
 from torchvision import transforms
 from dataloaders import custom_transforms as tr
 
+
 class CityscapesSegmentation(data.Dataset):
     NUM_CLASSES = 19
 
@@ -18,22 +19,27 @@ class CityscapesSegmentation(data.Dataset):
         self.files = {}
 
         self.images_base = os.path.join(self.root, 'leftImg8bit', self.split)
-        self.annotations_base = os.path.join(self.root, 'gtFine_trainvaltest', 'gtFine', self.split)
+        self.annotations_base = os.path.join(
+            self.root, 'gtFine_trainvaltest', 'gtFine', self.split)
 
-        self.files[split] = self.recursive_glob(rootdir=self.images_base, suffix='.png')
+        self.files[split] = self.recursive_glob(
+            rootdir=self.images_base, suffix='.png')
 
-        self.void_classes = [0, 1, 2, 3, 4, 5, 6, 9, 10, 14, 15, 16, 18, 29, 30, -1]
-        self.valid_classes = [7, 8, 11, 12, 13, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33]
-        self.class_names = ['unlabelled', 'road', 'sidewalk', 'building', 'wall', 'fence', \
-                            'pole', 'traffic_light', 'traffic_sign', 'vegetation', 'terrain', \
-                            'sky', 'person', 'rider', 'car', 'truck', 'bus', 'train', \
+        self.void_classes = [0, 1, 2, 3, 4, 5,
+                             6, 9, 10, 14, 15, 16, 18, 29, 30, -1]
+        self.valid_classes = [7, 8, 11, 12, 13, 17, 19,
+                              20, 21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33]
+        self.class_names = ['unlabelled', 'road', 'sidewalk', 'building', 'wall', 'fence',
+                            'pole', 'traffic_light', 'traffic_sign', 'vegetation', 'terrain',
+                            'sky', 'person', 'rider', 'car', 'truck', 'bus', 'train',
                             'motorcycle', 'bicycle']
 
         self.ignore_index = 255
         self.class_map = dict(zip(self.valid_classes, range(self.NUM_CLASSES)))
 
         if not self.files[split]:
-            raise Exception("No files for split=[%s] found in %s" % (split, self.images_base))
+            raise Exception("No files for split=[%s] found in %s" % (
+                split, self.images_base))
 
         print("Found %d %s images" % (len(self.files[split]), split))
 
@@ -81,9 +87,11 @@ class CityscapesSegmentation(data.Dataset):
     def transform_tr(self, sample):
         composed_transforms = transforms.Compose([
             tr.RandomHorizontalFlip(),
-            tr.RandomScaleCrop(base_size=self.args.base_size, crop_size=self.args.crop_size, fill=255),
+            tr.RandomScaleCrop(base_size=self.args.base_size,
+                               crop_size=self.args.crop_size, fill=255),
             tr.RandomGaussianBlur(),
-            tr.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            tr.Normalize(mean=(0.485, 0.456, 0.406),
+                         std=(0.229, 0.224, 0.225)),
             tr.ToTensor()])
 
         return composed_transforms(sample)
@@ -92,7 +100,8 @@ class CityscapesSegmentation(data.Dataset):
 
         composed_transforms = transforms.Compose([
             tr.FixScaleCrop(crop_size=self.args.crop_size),
-            tr.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            tr.Normalize(mean=(0.485, 0.456, 0.406),
+                         std=(0.229, 0.224, 0.225)),
             tr.ToTensor()])
 
         return composed_transforms(sample)
@@ -101,10 +110,12 @@ class CityscapesSegmentation(data.Dataset):
 
         composed_transforms = transforms.Compose([
             tr.FixedResize(size=self.args.crop_size),
-            tr.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            tr.Normalize(mean=(0.485, 0.456, 0.406),
+                         std=(0.229, 0.224, 0.225)),
             tr.ToTensor()])
 
         return composed_transforms(sample)
+
 
 if __name__ == '__main__':
     from dataloaders.utils import decode_segmap
@@ -119,7 +130,8 @@ if __name__ == '__main__':
 
     cityscapes_train = CityscapesSegmentation(args, split='train')
 
-    dataloader = DataLoader(cityscapes_train, batch_size=2, shuffle=True, num_workers=2)
+    dataloader = DataLoader(cityscapes_train, batch_size=1,
+                            shuffle=True, num_workers=2)
 
     for ii, sample in enumerate(dataloader):
         for jj in range(sample["image"].size()[0]):
@@ -143,4 +155,3 @@ if __name__ == '__main__':
             break
 
     plt.show(block=True)
-
